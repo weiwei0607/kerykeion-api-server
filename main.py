@@ -212,74 +212,68 @@ _THEME_PRESETS = {
 
 
 def _beautify_svg(svg: str, theme: str) -> str:
-    """Post-process Kerykeion SVG with custom color themes & effects."""
+    """Post-process Kerykeion SVG with custom color themes & effects.
+    
+    Strategy: keep the original :root block intact (it has 100+ vars),
+    then inject a SECOND :root block that overrides only the colors we care about.
+    CSS cascade means the later :root wins for same-name vars.
+    """
+    import re
     preset = _THEME_PRESETS.get(theme)
     if preset is None:
-        return svg  # unknown theme, return raw
+        return svg
 
-    # Build CSS variable overrides
-    css_vars = f"""
-    :root {{
-        --kerykeion-color-black: #000000;
-        --kerykeion-color-white: #ffffff;
-        --kerykeion-color-neutral-content: {preset['neutral_content']};
-        --kerykeion-color-base-content: {preset['neutral_content']};
-        --kerykeion-color-primary: {preset['primary']};
-        --kerykeion-color-secondary: {preset['secondary']};
-        --kerykeion-color-accent: {preset['accent']};
-        --kerykeion-color-neutral: {preset['base_300']};
-        --kerykeion-color-base-100: {preset['base_100']};
-        --kerykeion-color-base-200: {preset['base_200']};
-        --kerykeion-color-base-300: {preset['base_300']};
-        --kerykeion-modern-planet-ring: {preset['modern_planet_ring']};
-        --kerykeion-modern-planet-ring-outer: {preset['modern_planet_ring_outer']};
-        --kerykeion-modern-house-ring: {preset['modern_house_ring']};
-        --kerykeion-modern-stroke: {preset['modern_stroke']};
-        --kerykeion-modern-retrograde: {preset['modern_retrograde']};
-        --kerykeion-modern-indicator: {preset['modern_indicator']};
-        --kerykeion-color-info: {preset['info']};
-        --kerykeion-color-info-content: #000000;
-        --kerykeion-color-success: {preset['success']};
-        --kerykeion-color-warning: {preset['warning']};
-        --kerykeion-color-error: {preset['error']};
-        --kerykeion-chart-color-paper-0: {preset['paper_0']};
-        --kerykeion-chart-color-paper-1: {preset['paper']};
-    """
+    # Build override :root block (only vars we want to change)
+    overrides = f""":root {{
+    --kerykeion-color-neutral-content: {preset['neutral_content']};
+    --kerykeion-color-base-content: {preset['neutral_content']};
+    --kerykeion-color-primary: {preset['primary']};
+    --kerykeion-color-secondary: {preset['secondary']};
+    --kerykeion-color-accent: {preset['accent']};
+    --kerykeion-color-neutral: {preset['base_300']};
+    --kerykeion-color-base-100: {preset['base_100']};
+    --kerykeion-color-base-200: {preset['base_200']};
+    --kerykeion-color-base-300: {preset['base_300']};
+    --kerykeion-modern-planet-ring: {preset['modern_planet_ring']};
+    --kerykeion-modern-planet-ring-outer: {preset['modern_planet_ring_outer']};
+    --kerykeion-modern-house-ring: {preset['modern_house_ring']};
+    --kerykeion-modern-stroke: {preset['modern_stroke']};
+    --kerykeion-modern-retrograde: {preset['modern_retrograde']};
+    --kerykeion-modern-indicator: {preset['modern_indicator']};
+    --kerykeion-color-info: {preset['info']};
+    --kerykeion-color-success: {preset['success']};
+    --kerykeion-color-warning: {preset['warning']};
+    --kerykeion-color-error: {preset['error']};
+    --kerykeion-chart-color-paper-0: {preset['paper_0']};
+    --kerykeion-chart-color-paper-1: {preset['paper']};
+"""
     for i, color in enumerate(preset['zodiac_bg']):
-        css_vars += f"        --kerykeion-chart-color-zodiac-bg-{i}: {color};\n"
-        css_vars += f"        --kerykeion-modern-zodiac-bg-{i}: {color};\n"
+        overrides += f"    --kerykeion-chart-color-zodiac-bg-{i}: {color};\n"
+        overrides += f"    --kerykeion-modern-zodiac-bg-{i}: {color};\n"
+    overrides += "}\n"
 
-    css_vars += "    }\n"
+    # Find the FIRST <style kr:node='Theme_Colors_Tag'> block and append override :root inside it
+    # We inject after the existing :root { ... } closing brace within that style tag
+    style_match = re.search(r"(<style\s+kr:node='Theme_Colors_Tag'>.*?</style>)", svg, re.DOTALL)
+    if style_match:
+        original_style = style_match.group(1)
+        # Insert overrides just before </style>
+        new_style = original_style.replace("</style>", f"\n{overrides}</style>")
+        svg = svg.replace(original_style, new_style, 1)
+    else:
+        # Fallback: inject after </title>
+        svg = svg.replace("</title>", f"</title>\n<style>{overrides}</style>", 1)
 
-    # Replace the existing :root block
-    import re
-    svg = re.sub(r":root\s*\{[^}]*\}", css_vars.strip(), svg, flags=re.DOTALL)
-
-    # Inject extra effects
+    # Inject glow effects + background rect
     extra_css = ""
     if preset.get("glow"):
-        extra_css += """
-        text { filter: drop-shadow(0 0 1px rgba(255,255,255,0.3)); }
-        circle[stroke*="#"] { filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); }
-        """
+        extra_css += "text {{ filter: drop-shadow(0 0 1px rgba(255,255,255,0.3)); }}\n"
+        extra_css += "circle[stroke*='#'] {{ filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); }}\n"
 
-    # Apply background gradient via a rect behind everything
-    bg_rect = f"""
-    <defs>
-        <style>
-            {extra_css}
-        </style>
-    </defs>
-    <rect width="100%" height="100%" fill="{preset['paper']}" style="opacity:1" />
-    """
+    bg_rect = f'<rect width="100%" height="100%" fill="{preset["paper"]}" />\n'
 
-    # Insert background rect right after <svg ...> opening tag
-    svg = re.sub(
-        r"(<svg[^>]*>)",
-        rf"\1\n{bg_rect.strip()}",
-        svg,
-        count=1,
-    )
+    # Insert right after <svg ...> opening tag
+    svg = re.sub(r"(<svg[^>]*>)", rf"\1\n<defs><style>{extra_css}</style></defs>\n{bg_rect}", svg, count=1)
 
     return svg
 
