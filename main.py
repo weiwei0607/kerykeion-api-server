@@ -151,10 +151,11 @@ _THEME_PRESETS = {
         "modern_stroke": "#3a4e7a",
         "modern_retrograde": "#fb7185",
         "modern_indicator": "#4e6090",
-        "zodiac_bg": ["#0d1235", "#131c45", "#0d1235", "#131c45", "#0d1235", "#131c45",
-                      "#0d1235", "#131c45", "#0d1235", "#131c45", "#0d1235", "#131c45"],
+        "line_color": "#4a6fa5",
+        "house_number_color": "#7a9cc6",
+        "zodiac_bg": ["#0a0e2a", "#121a42", "#0a0e2a", "#121a42", "#0a0e2a", "#121a42",
+                      "#0a0e2a", "#121a42", "#0a0e2a", "#121a42", "#0a0e2a", "#121a42"],
         "glow": True,
-        "bg_gradient": "radial-gradient(circle at 50% 50%, #0f1a4a 0%, #080c24 70%)",
     },
     "sakura": {
         "name": "Sakura Dream",
@@ -177,10 +178,11 @@ _THEME_PRESETS = {
         "modern_stroke": "#e8b4c0",
         "modern_retrograde": "#e879a8",
         "modern_indicator": "#d4a5b5",
+        "line_color": "#c48a9e",
+        "house_number_color": "#a06078",
         "zodiac_bg": ["#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0",
                       "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0"],
         "glow": False,
-        "bg_gradient": "linear-gradient(135deg, #fdf2f4 0%, #fce7f0 100%)",
     },
     "gold": {
         "name": "Imperial Gold",
@@ -203,10 +205,11 @@ _THEME_PRESETS = {
         "modern_stroke": "#5a4a28",
         "modern_retrograde": "#e07060",
         "modern_indicator": "#7a6838",
+        "line_color": "#8a7a4a",
+        "house_number_color": "#b8a878",
         "zodiac_bg": ["#0f0c06", "#1a1408", "#0f0c06", "#1a1408", "#0f0c06", "#1a1408",
                       "#0f0c06", "#1a1408", "#0f0c06", "#1a1408", "#0f0c06", "#1a1408"],
         "glow": True,
-        "bg_gradient": "radial-gradient(circle at 50% 50%, #1c1508 0%, #0a0a0a 70%)",
     },
 }
 
@@ -246,6 +249,9 @@ def _beautify_svg(svg: str, theme: str) -> str:
     --kerykeion-color-error: {preset['error']};
     --kerykeion-chart-color-paper-0: {preset['paper_0']};
     --kerykeion-chart-color-paper-1: {preset['paper']};
+    --kerykeion-chart-color-houses-radix-line: {preset['line_color']};
+    --kerykeion-chart-color-houses-transit-line: {preset['line_color']};
+    --kerykeion-chart-color-house-number: {preset['house_number_color']};
 """
     for i, color in enumerate(preset['zodiac_bg']):
         overrides += f"    --kerykeion-chart-color-zodiac-bg-{i}: {color};\n"
@@ -253,27 +259,63 @@ def _beautify_svg(svg: str, theme: str) -> str:
     overrides += "}\n"
 
     # Find the FIRST <style kr:node='Theme_Colors_Tag'> block and append override :root inside it
-    # We inject after the existing :root { ... } closing brace within that style tag
     style_match = re.search(r"(<style\s+kr:node='Theme_Colors_Tag'>.*?</style>)", svg, re.DOTALL)
     if style_match:
         original_style = style_match.group(1)
-        # Insert overrides just before </style>
         new_style = original_style.replace("</style>", f"\n{overrides}</style>")
         svg = svg.replace(original_style, new_style, 1)
     else:
-        # Fallback: inject after </title>
         svg = svg.replace("</title>", f"</title>\n<style>{overrides}</style>", 1)
 
-    # Inject glow effects + background rect
-    extra_css = ""
+    # ── Inject advanced CSS effects ──
+    effects_css = f"""
+    /* Make house cusp lines solid and more visible */
+    line[style*="houses-radix-line"] {{ stroke-opacity: 0.75 !important; stroke-dasharray: none !important; stroke-width: 1.2px !important; }}
+    line[style*="houses-transit-line"] {{ stroke-opacity: 0.6 !important; stroke-dasharray: none !important; stroke-width: 1px !important; }}
+    
+    /* Tone down aspect lines so they don't overpower the chart */
+    g[kr:node="Aspects"] line {{ stroke-opacity: 0.45 !important; }}
+    g[kr:node="Aspects"] path {{ stroke-opacity: 0.45 !important; }}
+    
+    /* Planet symbols glow */
+    text {{ font-family: 'Noto Sans', 'PingFang TC', sans-serif; }}
+    g[kr:node*="Planet"] text, g[kr:node*="Cusp"] text {{ filter: drop-shadow(0 0 2px {preset['paper']}); }}
+    
+    /* House numbers more readable */
+    g[kr:node="HouseNumber"] text {{ fill-opacity: 0.9 !important; font-weight: 500; }}
+    
+    /* Zodiac ring stroke pop */
+    circle[kr:node="Zodiac_Wheel"] {{ stroke-opacity: 0.6; }}
+    """
+
     if preset.get("glow"):
-        extra_css += "text {{ filter: drop-shadow(0 0 1px rgba(255,255,255,0.3)); }}\n"
-        extra_css += "circle[stroke*='#'] {{ filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); }}\n"
+        effects_css += f"""
+    /* Soft glow on planet glyphs for dark themes */
+    g[kr:node*="Planet"] text, g[kr:node*="Cusp"] text {{ filter: drop-shadow(0 0 3px rgba(255,255,255,0.25)); }}
+    """
 
     bg_rect = f'<rect width="100%" height="100%" fill="{preset["paper"]}" />\n'
 
+    # Star field for cosmic/gold dark themes
+    star_field = ""
+    if preset.get("glow"):
+        import random
+        random.seed(42)  # deterministic
+        stars = []
+        for _ in range(80):
+            x, y = random.randint(0, 890), random.randint(0, 580)
+            r = random.choice([0.5, 0.8, 1.2])
+            op = random.choice([0.3, 0.5, 0.7])
+            stars.append(f'<circle cx="{x}" cy="{y}" r="{r}" fill="#ffffff" opacity="{op}"/>')
+        star_field = "\n".join(stars) + "\n"
+
     # Insert right after <svg ...> opening tag
-    svg = re.sub(r"(<svg[^>]*>)", rf"\1\n<defs><style>{extra_css}</style></defs>\n{bg_rect}", svg, count=1)
+    svg = re.sub(
+        r"(<svg[^>]*>)",
+        rf"\1\n<defs><style>{effects_css}</style></defs>\n{bg_rect}{star_field}",
+        svg,
+        count=1,
+    )
 
     return svg
 
