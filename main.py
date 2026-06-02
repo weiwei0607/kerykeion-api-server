@@ -52,7 +52,7 @@ class ChartRequest(BaseModel):
 class SynastryRequest(BaseModel):
     subject_1: Subject
     subject_2: Subject
-    theme: Literal["light", "dark"] = "dark"
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
     split_chart: bool = False
 
 
@@ -62,19 +62,19 @@ class TransitRequest(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         description="YYYY-MM-DD",
     )
-    theme: Literal["light", "dark"] = "dark"
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
 
 
 class CompositeRequest(BaseModel):
     subject_1: Subject
     subject_2: Subject
-    theme: Literal["light", "dark"] = "dark"
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
 
 
 class ReturnRequest(BaseModel):
     subject: Subject
     return_year: int = Field(..., ge=1800, le=2100)
-    theme: Literal["light", "dark"] = "dark"
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
 
 
 # ── Helpers ──────────────────────────────────────────────────
@@ -480,7 +480,7 @@ def now_chart(
     longitude: float = 121.53,
     latitude: float = 25.04,
     timezone: str = "Asia/Taipei",
-    theme: Literal["light", "dark"] = "dark",
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic",
 ):
     """Current moment chart (UTC now)."""
     try:
