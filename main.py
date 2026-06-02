@@ -45,7 +45,7 @@ class Subject(BaseModel):
 
 class ChartRequest(BaseModel):
     subject: Subject
-    theme: Literal["light", "dark"] = "dark"
+    theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
     split_chart: bool = False
 
 
@@ -129,27 +129,186 @@ def _serialize_subject(subj):
     }
 
 
+_THEME_PRESETS = {
+    "cosmic": {
+        "name": "Cosmic Night",
+        "paper": "#080c24",
+        "paper_0": "#c8d0e0",
+        "base_100": "#080c24",
+        "base_200": "#0a1030",
+        "base_300": "#131842",
+        "neutral_content": "#a8b5d0",
+        "primary": "#60a5fa",
+        "secondary": "#a78bfa",
+        "accent": "#f472b6",
+        "info": "#38bdf8",
+        "success": "#34d399",
+        "warning": "#fbbf24",
+        "error": "#fb7185",
+        "modern_planet_ring": "#131842",
+        "modern_planet_ring_outer": "#0d1230",
+        "modern_house_ring": "#1e2a5a",
+        "modern_stroke": "#3a4e7a",
+        "modern_retrograde": "#fb7185",
+        "modern_indicator": "#4e6090",
+        "zodiac_bg": ["#0d1235", "#131c45", "#0d1235", "#131c45", "#0d1235", "#131c45",
+                      "#0d1235", "#131c45", "#0d1235", "#131c45", "#0d1235", "#131c45"],
+        "glow": True,
+        "bg_gradient": "radial-gradient(circle at 50% 50%, #0f1a4a 0%, #080c24 70%)",
+    },
+    "sakura": {
+        "name": "Sakura Dream",
+        "paper": "#fdf2f4",
+        "paper_0": "#5a3542",
+        "base_100": "#fdf2f4",
+        "base_200": "#fce7f0",
+        "base_300": "#f8d7e8",
+        "neutral_content": "#5a3542",
+        "primary": "#e879a8",
+        "secondary": "#c084fc",
+        "accent": "#f472b6",
+        "info": "#67e8f9",
+        "success": "#6ee7b7",
+        "warning": "#fcd34d",
+        "error": "#fb7185",
+        "modern_planet_ring": "#fce7f0",
+        "modern_planet_ring_outer": "#f8d7e8",
+        "modern_house_ring": "#f5d0e0",
+        "modern_stroke": "#e8b4c0",
+        "modern_retrograde": "#e879a8",
+        "modern_indicator": "#d4a5b5",
+        "zodiac_bg": ["#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0",
+                      "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0", "#fdf2f4", "#fce7f0"],
+        "glow": False,
+        "bg_gradient": "linear-gradient(135deg, #fdf2f4 0%, #fce7f0 100%)",
+    },
+    "gold": {
+        "name": "Imperial Gold",
+        "paper": "#0a0a0a",
+        "paper_0": "#d4af37",
+        "base_100": "#0a0a0a",
+        "base_200": "#141208",
+        "base_300": "#1c1508",
+        "neutral_content": "#c9b896",
+        "primary": "#d4af37",
+        "secondary": "#c9a84c",
+        "accent": "#e8c866",
+        "info": "#87ceeb",
+        "success": "#98d8a0",
+        "warning": "#f0c040",
+        "error": "#e07060",
+        "modern_planet_ring": "#1c1508",
+        "modern_planet_ring_outer": "#141208",
+        "modern_house_ring": "#2a200c",
+        "modern_stroke": "#5a4a28",
+        "modern_retrograde": "#e07060",
+        "modern_indicator": "#7a6838",
+        "zodiac_bg": ["#0f0c06", "#1a1408", "#0f0c06", "#1a1408", "#0f0c06", "#1a1408",
+                      "#0f0c06", "#1a1408", "#0f0c06", "#1a1408", "#0f0c06", "#1a1408"],
+        "glow": True,
+        "bg_gradient": "radial-gradient(circle at 50% 50%, #1c1508 0%, #0a0a0a 70%)",
+    },
+}
+
+
+def _beautify_svg(svg: str, theme: str) -> str:
+    """Post-process Kerykeion SVG with custom color themes & effects."""
+    preset = _THEME_PRESETS.get(theme)
+    if preset is None:
+        return svg  # unknown theme, return raw
+
+    # Build CSS variable overrides
+    css_vars = f"""
+    :root {{
+        --kerykeion-color-black: #000000;
+        --kerykeion-color-white: #ffffff;
+        --kerykeion-color-neutral-content: {preset['neutral_content']};
+        --kerykeion-color-base-content: {preset['neutral_content']};
+        --kerykeion-color-primary: {preset['primary']};
+        --kerykeion-color-secondary: {preset['secondary']};
+        --kerykeion-color-accent: {preset['accent']};
+        --kerykeion-color-neutral: {preset['base_300']};
+        --kerykeion-color-base-100: {preset['base_100']};
+        --kerykeion-color-base-200: {preset['base_200']};
+        --kerykeion-color-base-300: {preset['base_300']};
+        --kerykeion-modern-planet-ring: {preset['modern_planet_ring']};
+        --kerykeion-modern-planet-ring-outer: {preset['modern_planet_ring_outer']};
+        --kerykeion-modern-house-ring: {preset['modern_house_ring']};
+        --kerykeion-modern-stroke: {preset['modern_stroke']};
+        --kerykeion-modern-retrograde: {preset['modern_retrograde']};
+        --kerykeion-modern-indicator: {preset['modern_indicator']};
+        --kerykeion-color-info: {preset['info']};
+        --kerykeion-color-info-content: #000000;
+        --kerykeion-color-success: {preset['success']};
+        --kerykeion-color-warning: {preset['warning']};
+        --kerykeion-color-error: {preset['error']};
+        --kerykeion-chart-color-paper-0: {preset['paper_0']};
+        --kerykeion-chart-color-paper-1: {preset['paper']};
+    """
+    for i, color in enumerate(preset['zodiac_bg']):
+        css_vars += f"        --kerykeion-chart-color-zodiac-bg-{i}: {color};\n"
+        css_vars += f"        --kerykeion-modern-zodiac-bg-{i}: {color};\n"
+
+    css_vars += "    }\n"
+
+    # Replace the existing :root block
+    import re
+    svg = re.sub(r":root\s*\{[^}]*\}", css_vars.strip(), svg, flags=re.DOTALL)
+
+    # Inject extra effects
+    extra_css = ""
+    if preset.get("glow"):
+        extra_css += """
+        text { filter: drop-shadow(0 0 1px rgba(255,255,255,0.3)); }
+        circle[stroke*="#"] { filter: drop-shadow(0 0 2px rgba(255,255,255,0.15)); }
+        """
+
+    # Apply background gradient via a rect behind everything
+    bg_rect = f"""
+    <defs>
+        <style>
+            {extra_css}
+        </style>
+    </defs>
+    <rect width="100%" height="100%" fill="{preset['paper']}" style="opacity:1" />
+    """
+
+    # Insert background rect right after <svg ...> opening tag
+    svg = re.sub(
+        r"(<svg[^>]*>)",
+        rf"\1\n{bg_rect.strip()}",
+        svg,
+        count=1,
+    )
+
+    return svg
+
+
 def _make_svg(subject, chart_type="Natal", second_obj=None, theme="dark"):
-    """Render SVG chart using Kerykeion."""
+    """Render SVG chart using Kerykeion, then apply custom theme beautification."""
     from kerykeion import KerykeionChartSVG
+    # Kerykeion only knows built-in themes; use 'dark' as base for custom presets
+    kerykeion_theme = theme if theme in ("dark", "light", "classic") else "dark"
     chart = KerykeionChartSVG(
         subject,
         chart_type=chart_type,
         second_obj=second_obj,
-        theme=theme,
+        theme=kerykeion_theme,
     )
-    # KerykeionChartSVG generates an SVG file via .makeSVG()
-    # We temporarily write to a file then read it back
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdir:
         chart.output_directory = tmpdir
         chart.makeSVG()
-        # Find the generated SVG file (filename includes subject name + chart type)
         svg_files = [f for f in os.listdir(tmpdir) if f.endswith(".svg")]
         if not svg_files:
             raise RuntimeError("SVG generation failed: no .svg file found")
         with open(os.path.join(tmpdir, svg_files[0]), "r", encoding="utf-8") as f:
             svg = f.read()
+
+    # Apply custom beautification if theme is one of our presets
+    if theme in _THEME_PRESETS:
+        svg = _beautify_svg(svg, theme)
+
     return svg
 
 
