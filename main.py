@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
+from custom_renderer import render_chart as custom_render_chart
+
 app = FastAPI(
     title="Kerykeion Astrology API",
     description="Free birth charts, synastry, transits, composite charts, returns & moon phases.",
@@ -46,6 +48,7 @@ class Subject(BaseModel):
 class ChartRequest(BaseModel):
     subject: Subject
     theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
+    renderer: Literal["kerykeion", "custom"] = "kerykeion"
     split_chart: bool = False
 
 
@@ -53,6 +56,7 @@ class SynastryRequest(BaseModel):
     subject_1: Subject
     subject_2: Subject
     theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
+    renderer: Literal["kerykeion", "custom"] = "kerykeion"
     split_chart: bool = False
 
 
@@ -63,18 +67,21 @@ class TransitRequest(BaseModel):
         description="YYYY-MM-DD",
     )
     theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
+    renderer: Literal["kerykeion", "custom"] = "kerykeion"
 
 
 class CompositeRequest(BaseModel):
     subject_1: Subject
     subject_2: Subject
     theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
+    renderer: Literal["kerykeion", "custom"] = "kerykeion"
 
 
 class ReturnRequest(BaseModel):
     subject: Subject
     return_year: int = Field(..., ge=1800, le=2100)
     theme: Literal["light", "dark", "cosmic", "sakura", "gold"] = "cosmic"
+    renderer: Literal["kerykeion", "custom"] = "kerykeion"
 
 
 # ── Helpers ──────────────────────────────────────────────────
@@ -320,8 +327,11 @@ def _beautify_svg(svg: str, theme: str) -> str:
     return svg
 
 
-def _make_svg(subject, chart_type="Natal", second_obj=None, theme="dark"):
-    """Render SVG chart using Kerykeion, then apply custom theme beautification."""
+def _make_svg(subject, chart_type="Natal", second_obj=None, theme="dark", renderer="kerykeion"):
+    """Render SVG chart using Kerykeion or custom renderer."""
+    if renderer == "custom":
+        return custom_render_chart(subject, theme=theme, title=getattr(subject, "name", None))
+
     from kerykeion import KerykeionChartSVG
     # Kerykeion only knows built-in themes; use 'dark' as base for custom presets
     kerykeion_theme = theme if theme in ("dark", "light", "classic") else "dark"
@@ -361,7 +371,7 @@ def birth_chart(req: ChartRequest):
     try:
         subj = _to_kerykeion_subject(req.subject)
         data = _serialize_subject(subj)
-        svg = _make_svg(subj, chart_type="Natal", theme=req.theme)
+        svg = _make_svg(subj, chart_type="Natal", theme=req.theme, renderer=req.renderer)
         if req.split_chart:
             return {
                 "status": "OK",
@@ -382,7 +392,7 @@ def synastry(req: SynastryRequest):
     try:
         s1 = _to_kerykeion_subject(req.subject_1)
         s2 = _to_kerykeion_subject(req.subject_2)
-        svg = _make_svg(s1, chart_type="Synastry", second_obj=s2, theme=req.theme)
+        svg = _make_svg(s1, chart_type="Synastry", second_obj=s2, theme=req.theme, renderer=req.renderer)
         if req.split_chart:
             return {
                 "status": "OK",
@@ -422,7 +432,7 @@ def transit(req: TransitRequest):
                 timezone=subj.tz_str,
             )
         )
-        svg = _make_svg(subj, chart_type="Transit", second_obj=transit_subj, theme=req.theme)
+        svg = _make_svg(subj, chart_type="Transit", second_obj=transit_subj, theme=req.theme, renderer=req.renderer)
         return {
             "status": "OK",
             "chart": svg,
@@ -441,7 +451,7 @@ def composite(req: CompositeRequest):
     try:
         s1 = _to_kerykeion_subject(req.subject_1)
         s2 = _to_kerykeion_subject(req.subject_2)
-        svg = _make_svg(s1, chart_type="Composite", second_obj=s2, theme=req.theme)
+        svg = _make_svg(s1, chart_type="Composite", second_obj=s2, theme=req.theme, renderer=req.renderer)
         return {
             "status": "OK",
             "chart": svg,
@@ -472,7 +482,7 @@ def solar_return(req: ReturnRequest):
                 timezone=subj.tz_str,
             )
         )
-        svg = _make_svg(sr, chart_type="Natal", theme=req.theme)
+        svg = _make_svg(sr, chart_type="Natal", theme=req.theme, renderer=req.renderer)
         return {
             "status": "OK",
             "chart": svg,
@@ -500,7 +510,7 @@ def lunar_return(req: ReturnRequest):
                 timezone=subj.tz_str,
             )
         )
-        svg = _make_svg(lr, chart_type="Natal", theme=req.theme)
+        svg = _make_svg(lr, chart_type="Natal", theme=req.theme, renderer=req.renderer)
         return {
             "status": "OK",
             "chart": svg,
@@ -534,7 +544,7 @@ def now_chart(
                 timezone=timezone,
             )
         )
-        svg = _make_svg(subj, chart_type="Natal", theme=theme)
+        svg = _make_svg(subj, chart_type="Natal", theme=theme, renderer="kerykeion")
         return {
             "status": "OK",
             "chart": svg,
@@ -610,7 +620,7 @@ def moon_phase():
 @app.post("/api/v1/chart/birth-chart/svg", response_class=PlainTextResponse)
 def birth_chart_svg(req: ChartRequest):
     subj = _to_kerykeion_subject(req.subject)
-    svg = _make_svg(subj, chart_type="Natal", theme=req.theme)
+    svg = _make_svg(subj, chart_type="Natal", theme=req.theme, renderer=req.renderer)
     return svg
 
 
