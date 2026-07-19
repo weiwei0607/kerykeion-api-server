@@ -1,59 +1,70 @@
 # Kerykeion Astrology API Server
 
-Free alternative to RapidAPI Astrologer. Self-hosted birth charts, synastry, transits, composite charts, returns & moon phases.
+Free alternative to RapidAPI Astrologer. Powered by NASA JPL ephemerides via Kerykeion + Swiss Ephemeris.
 
-## Powered by
-- [Kerykeion](https://github.com/g-battaglia/kerykeion) — NASA JPL ephemerides
-- [Swiss Ephemeris](https://www.astro.com/swisseph/) — sub-arcsecond precision
-- FastAPI + Uvicorn
+## Features
 
-## Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/api/v1/chart/birth-chart` | POST | Natal chart SVG + data |
-| `/api/v1/chart/synastry` | POST | Synastry chart (2 people) |
-| `/api/v1/chart/transit` | POST | Transit chart vs natal |
-| `/api/v1/chart/composite` | POST | Composite chart (midpoint) |
-| `/api/v1/chart/solar-return` | POST | Solar return chart |
-| `/api/v1/chart/lunar-return` | POST | Lunar return chart |
-| `/api/v1/now/chart` | GET | Current moment chart |
-| `/api/v1/now/moon-phase` | GET | Current moon phase |
+- Birth charts (Natal)
+- Synastry (relationship compatibility)
+- Transit charts
+- Composite charts
+- Solar & Lunar returns
+- Current moment chart
+- Moon phase data
+- 5 themes: light, dark, cosmic, sakura, gold
+- Two renderers: Kerykeion (full) / Custom (lightweight)
 
 ## Quick Start
 
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-uvicorn main:app --reload
+
+# Run locally
+python -m kerykeion_api.main
 ```
 
-Test:
+## API Authentication
+
+Set `API_KEY` in your environment or `.env` file. Include it in requests:
+
 ```bash
-curl -X POST http://localhost:8000/api/v1/chart/birth-chart \
-  -H "Content-Type: application/json" \
-  -d '{
-    "subject": {
-      "name": "John Lennon",
-      "year": 1940, "month": 10, "day": 9,
-      "hour": 18, "minute": 30,
-      "longitude": -2.98, "latitude": 53.41,
-      "timezone": "Europe/London"
-    },
-    "theme": "dark"
-  }'
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/v1/now/moon-phase
 ```
 
-## Deploy to Render
+If `API_KEY` is not set, the API runs in dev mode (no auth required).
 
-1. Push this repo to GitHub
-2. Connect repo on [Render](https://render.com)
-3. Use `render.yaml` blueprint (auto-detected)
-4. Free tier works fine
+## Deployment
 
-## No API Key Required
+### Render.com
 
-Unlike RapidAPI, this server has **no API key**. If you deploy publicly, consider adding:
-- A simple Bearer token middleware
-- Rate limiting (`slowapi`)
-- CORS origin whitelist
+Click the button or push to GitHub with `render.yaml` in the root.
+
+### Docker
+
+```bash
+docker build -t kerykeion-api .
+docker run -p 8000:8000 -e API_KEY=your-key kerykeion-api
+```
+
+## Endpoints
+
+See `/docs` (Swagger UI) or `/redoc` (ReDoc) when running locally.
+
+## Rate Limits
+
+- Birth chart: 30/minute
+- Synastry / Transit / Composite / Returns: 20/minute
+- Moon phase: 60/minute
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_KEY` | "" | API authentication key |
+| `CORS_ORIGINS` | "*" | Comma-separated allowed origins |
+| `PORT` | 8000 | Server port |
+
+## License
+
+MIT

@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install Swiss Ephemeris data files + build deps
+# Install build deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libffi-dev \
@@ -11,11 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download Swiss Ephemeris data for Kerykeion
+# Pre-download Swiss Ephemeris data
 RUN python -c "from kerykeion.settings.kerykeion_settings import get_settings; get_settings()"
 
-COPY main.py .
+COPY kerykeion_api/ ./kerykeion_api/
+COPY custom_renderer.py .
+COPY zodiac_paths.py .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "kerykeion_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
