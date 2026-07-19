@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -23,12 +23,12 @@ router = APIRouter(prefix="/api/v1/chart", tags=["charts"])
 
 @router.post("/birth-chart")
 @limiter.limit("30/minute")
-def birth_chart(request: ChartRequest, api_key: str = Depends(verify_api_key)):
+def birth_chart(request: Request, body: ChartRequest, api_key: str = Depends(verify_api_key)):
     try:
-        subj = to_kerykeion_subject(request.subject)
+        subj = to_kerykeion_subject(body.subject)
         data = serialize_subject(subj)
-        svg = make_svg(subj, chart_type="Natal", theme=request.theme, renderer=request.renderer)
-        if request.split_chart:
+        svg = make_svg(subj, chart_type="Natal", theme=body.theme, renderer=body.renderer)
+        if body.split_chart:
             return {"status": "OK", "chart_wheel": svg, "chart_data": data}
         return {"status": "OK", "chart": svg, "chart_data": data}
     except Exception as exc:
@@ -37,12 +37,12 @@ def birth_chart(request: ChartRequest, api_key: str = Depends(verify_api_key)):
 
 @router.post("/synastry")
 @limiter.limit("20/minute")
-def synastry(request: SynastryRequest, api_key: str = Depends(verify_api_key)):
+def synastry(request: Request, body: SynastryRequest, api_key: str = Depends(verify_api_key)):
     try:
-        s1 = to_kerykeion_subject(request.subject_1)
-        s2 = to_kerykeion_subject(request.subject_2)
-        svg = make_svg(s1, chart_type="Synastry", second_obj=s2, theme=request.theme, renderer=request.renderer)
-        if request.split_chart:
+        s1 = to_kerykeion_subject(body.subject_1)
+        s2 = to_kerykeion_subject(body.subject_2)
+        svg = make_svg(s1, chart_type="Synastry", second_obj=s2, theme=body.theme, renderer=body.renderer)
+        if body.split_chart:
             return {
                 "status": "OK",
                 "chart_wheel": svg,
@@ -65,10 +65,10 @@ def synastry(request: SynastryRequest, api_key: str = Depends(verify_api_key)):
 
 @router.post("/transit")
 @limiter.limit("20/minute")
-def transit(request: TransitRequest, api_key: str = Depends(verify_api_key)):
+def transit(request: Request, body: TransitRequest, api_key: str = Depends(verify_api_key)):
     try:
-        subj = to_kerykeion_subject(request.subject)
-        td = datetime.strptime(request.transit_date, "%Y-%m-%d")
+        subj = to_kerykeion_subject(body.subject)
+        td = datetime.strptime(body.transit_date, "%Y-%m-%d")
         transit_subj = to_kerykeion_subject(
             Subject(
                 name="Transit",
@@ -82,11 +82,11 @@ def transit(request: TransitRequest, api_key: str = Depends(verify_api_key)):
                 timezone=subj.tz_str,
             )
         )
-        svg = make_svg(subj, chart_type="Transit", second_obj=transit_subj, theme=request.theme, renderer=request.renderer)
+        svg = make_svg(subj, chart_type="Transit", second_obj=transit_subj, theme=body.theme, renderer=body.renderer)
         return {
             "status": "OK",
             "chart": svg,
-            "transit_date": request.transit_date,
+            "transit_date": body.transit_date,
             "chart_data": {"natal": serialize_subject(subj), "transit": serialize_subject(transit_subj)},
         }
     except Exception as exc:
@@ -95,11 +95,11 @@ def transit(request: TransitRequest, api_key: str = Depends(verify_api_key)):
 
 @router.post("/composite")
 @limiter.limit("20/minute")
-def composite(request: CompositeRequest, api_key: str = Depends(verify_api_key)):
+def composite(request: Request, body: CompositeRequest, api_key: str = Depends(verify_api_key)):
     try:
-        s1 = to_kerykeion_subject(request.subject_1)
-        s2 = to_kerykeion_subject(request.subject_2)
-        svg = make_svg(s1, chart_type="Composite", second_obj=s2, theme=request.theme, renderer=request.renderer)
+        s1 = to_kerykeion_subject(body.subject_1)
+        s2 = to_kerykeion_subject(body.subject_2)
+        svg = make_svg(s1, chart_type="Composite", second_obj=s2, theme=body.theme, renderer=body.renderer)
         return {
             "status": "OK",
             "chart": svg,
@@ -111,13 +111,13 @@ def composite(request: CompositeRequest, api_key: str = Depends(verify_api_key))
 
 @router.post("/solar-return")
 @limiter.limit("20/minute")
-def solar_return(request: ReturnRequest, api_key: str = Depends(verify_api_key)):
+def solar_return(request: Request, body: ReturnRequest, api_key: str = Depends(verify_api_key)):
     try:
-        subj = to_kerykeion_subject(request.subject)
+        subj = to_kerykeion_subject(body.subject)
         sr = to_kerykeion_subject(
             Subject(
-                name=f"{subj.name} Solar Return {request.return_year}",
-                year=request.return_year,
+                name=f"{subj.name} Solar Return {body.return_year}",
+                year=body.return_year,
                 month=subj.month,
                 day=subj.day,
                 hour=subj.hour,
@@ -127,21 +127,21 @@ def solar_return(request: ReturnRequest, api_key: str = Depends(verify_api_key))
                 timezone=subj.tz_str,
             )
         )
-        svg = make_svg(sr, chart_type="Natal", theme=request.theme, renderer=request.renderer)
-        return {"status": "OK", "chart": svg, "return_year": request.return_year, "chart_data": serialize_subject(sr)}
+        svg = make_svg(sr, chart_type="Natal", theme=body.theme, renderer=body.renderer)
+        return {"status": "OK", "chart": svg, "return_year": body.return_year, "chart_data": serialize_subject(sr)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/lunar-return")
 @limiter.limit("20/minute")
-def lunar_return(request: ReturnRequest, api_key: str = Depends(verify_api_key)):
+def lunar_return(request: Request, body: ReturnRequest, api_key: str = Depends(verify_api_key)):
     try:
-        subj = to_kerykeion_subject(request.subject)
+        subj = to_kerykeion_subject(body.subject)
         lr = to_kerykeion_subject(
             Subject(
-                name=f"{subj.name} Lunar Return {request.return_year}",
-                year=request.return_year,
+                name=f"{subj.name} Lunar Return {body.return_year}",
+                year=body.return_year,
                 month=subj.month,
                 day=subj.day,
                 hour=subj.hour,
@@ -151,7 +151,7 @@ def lunar_return(request: ReturnRequest, api_key: str = Depends(verify_api_key))
                 timezone=subj.tz_str,
             )
         )
-        svg = make_svg(lr, chart_type="Natal", theme=request.theme, renderer=request.renderer)
-        return {"status": "OK", "chart": svg, "return_year": request.return_year, "chart_data": serialize_subject(lr)}
+        svg = make_svg(lr, chart_type="Natal", theme=body.theme, renderer=body.renderer)
+        return {"status": "OK", "chart": svg, "return_year": body.return_year, "chart_data": serialize_subject(lr)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/v1/now", tags=["now"])
 @router.get("/chart")
 @limiter.limit("30/minute")
 def now_chart(
+    request: Request,
     longitude: float = 121.53,
     latitude: float = 25.04,
     timezone: str = "Asia/Taipei",
@@ -49,7 +50,7 @@ def now_chart(
 
 @router.get("/moon-phase")
 @limiter.limit("60/minute")
-def moon_phase(api_key: str = Depends(verify_api_key)):
+def moon_phase(request: Request, api_key: str = Depends(verify_api_key)):
     """Current moon phase name and illumination percentage."""
     try:
         data = _get_moon_phase()
